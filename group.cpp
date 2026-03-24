@@ -7,10 +7,13 @@
 #include <iomanip>
 #include <vector>
 #include <random>
-const int BASE_COST = 1;
-const int LIMIT_SUB_GROUPS_PER_GROUP = 5;
+#include <string>
 
+const int BASE_LVL = 1;
+const int LIMIT_SUB_GROUPS_PER_GROUP = 5;
+const int BASE_COST = 10;
 std::vector<long> ids;
+std::vector<std::string> roundLogs;
 
 int generateRandom(int min, int max) {
     static std::random_device rd;
@@ -43,13 +46,13 @@ bool hasReachedLimit(group& root, int lv) {
     return hasReachedLimitSubGroups(root, lv, 1);
 }
 
-long calculateCost(group& root, long id, int amount, int lv) {
+long calculateCost(group& root, long id, int size, int lv) {
     long total = 0;
     if(root.id == id) {
-        return root.branchs.size() + amount + lv;
+        return BASE_COST*size;
     }
     for(auto& branch: root.branchs) {
-        total = calculateCost(branch, id, amount, lv+1);
+        total = calculateCost(branch, id, size, lv+1);
         if(total > 0) break;
     }
     return total;
@@ -76,10 +79,31 @@ int totalLvs(group& root) {
     return getMaxLvl(root, 1);
 }
 
+int getLvl(group& root, long id, int lv) {
+    if(root.id == id) {
+        return lv;
+    }
+    for(auto& branch : root.branchs) {
+        int result = getLvl(branch, id, lv + 1);
+        if(result != -1) {
+            return result;
+        }
+    }
+    return -1;
+}
+
+void insertLog(std::string log) {
+    roundLogs.push_back(log);
+}
+
+void clearLogs() {
+    roundLogs.clear();
+}
+
 void insertGroup(group& root, group& current, group& newGroup, resource& res, long idToInsert) {
     if(current.id == idToInsert) {
-        newGroup.cost = calculateCost(root, current.id, newGroup.amount, BASE_COST);
-        res.value -= newGroup.cost;
+        newGroup.cost = calculateCost(root, current.id, newGroup.size, BASE_LVL);
+        res.value -= BASE_COST;
         current.branchs.push_back(newGroup);
         return;
     }
@@ -88,13 +112,51 @@ void insertGroup(group& root, group& current, group& newGroup, resource& res, lo
     }
 }
 
-void createGroup(group&root, resource& res, int amount) {
+void createGroup(group&root, resource& res) {
     group newGroup;
     newGroup.id = generateId();
-    newGroup.amount = amount;
+    newGroup.size = generateRandom(1, 10);
     long idToInsert = getRandomId();
     insertGroup(root, root, newGroup, res, idToInsert);
     insertId(newGroup.id);
+    insertLog("Grupo criado: [ID: " + std::to_string(newGroup.id) + "] | Tamanho: " + std::to_string(newGroup.size) + " | Custo: " + std::to_string(newGroup.cost) + " | Recursos restantes: " + std::to_string(res.value));
+}
+
+
+
+void consumeResource(group& root, group& current, resource& res) {
+    if(current.branchs.empty()) {
+        return;
+    }
+    for(auto& branch: current.branchs) {
+        int currentLvl = getLvl(root, branch.id, 1);
+        res.value -= branch.cost;
+        res.value += BASE_COST * currentLvl;
+        insertLog("[ID: " + std::to_string(branch.id) + "] | Qtd consumida: " + std::to_string(branch.cost) + " | Recursos restantes: " + std::to_string(res.value));
+        consumeResource(root, branch, res);
+    }
+}
+
+void updateGroups(group& root, resource& res) {
+    consumeResource(root, root, res);
+}
+
+void printLogs() {
+    std::cout << "\n==========================================" << std::endl;
+    std::cout << "                LOGS DA RODADA             " << std::endl;
+    std::cout << "==========================================" << std::endl;
+    for(const auto& log : roundLogs) {
+        std::cout << log << std::endl;
+    }
+    std::cout << "==========================================\n" << std::endl;
+}
+
+void clearTerminal() {
+    #ifdef _WIN32
+        std::system("cls");
+    #elif __linux__
+        std::cout << "\033[H\033[J";
+    #endif
 }
 
 void printGroupByLvl(group& current, std::string prefix, bool isLast) {
@@ -102,7 +164,7 @@ void printGroupByLvl(group& current, std::string prefix, bool isLast) {
     std::cout << (isLast ? "└── " : "├── ");
 
     std::cout << "\033[1;32m[ID: " << current.id << "]\033[0m " // Verde para ID
-              << "Amt: " << current.amount 
+              << "Amt: " << current.size 
               << " | Cost: \033[1;31m" << current.cost << "\033[0m" << std::endl; // Vermelho para Cost
 
     std::string newPrefix = prefix + (isLast ? "    " : "│   ");
@@ -127,10 +189,8 @@ void printGroup(group& root, resource& res) {
 
 
 
-// Função auxiliar recursiva para contar os nós
 void countNodesByLvl(group& current, int lv, std::map<int, int>& counts) {
-    counts[lv]++; // Incrementa o contador do nível atual
-    
+    counts[lv]++;
     for (auto& branch : current.branchs) {
         countNodesByLvl(branch, lv + 1, counts);
     }
