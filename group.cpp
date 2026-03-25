@@ -46,10 +46,14 @@ bool hasReachedLimit(group& root, int lv) {
     return hasReachedLimitSubGroups(root, lv, 1);
 }
 
+bool isFirstRound(group& root) {
+    return root.branchs.empty();
+}
+
 long calculateCost(group& root, long id, int size, int lv) {
     long total = 0;
     if(root.id == id) {
-        return BASE_COST*size;
+        return BASE_COST * size * lv;
     }
     for(auto& branch: root.branchs) {
         total = calculateCost(branch, id, size, lv+1);
@@ -131,14 +135,36 @@ void consumeResource(group& root, group& current, resource& res) {
     for(auto& branch: current.branchs) {
         int currentLvl = getLvl(root, branch.id, 1);
         res.value -= branch.cost;
-        res.value += BASE_COST * currentLvl;
-        insertLog("[ID: " + std::to_string(branch.id) + "] | Qtd consumida: " + std::to_string(branch.cost) + " | Recursos restantes: " + std::to_string(res.value));
         consumeResource(root, branch, res);
     }
 }
 
-void updateGroups(group& root, resource& res) {
+void updateGroups(group& root, resource& res, int round) {
+    if(round == 1) {
+        return;
+    }
     consumeResource(root, root, res);
+}
+
+long calculateIncreaseResource(group& root, int lv = 1) {
+    if(root.branchs.empty()) {
+        return BASE_COST * root.size * lv;
+    }
+    long totalIncrease = 0;
+    for(auto& branch: root.branchs) {
+        totalIncrease += calculateIncreaseResource(branch, lv + 1);
+    }
+    return totalIncrease;
+}
+
+void updateResource(group& root, resource& res, int round) {
+    if(round == 1) {
+        return;
+    }
+    long increase = calculateIncreaseResource(root);
+    res.increase = increase;
+    res.value += increase;
+    insertLog("Recursos aumentados: " + std::to_string(increase) + " | Recursos atuais: " + std::to_string(res.value));
 }
 
 void printLogs() {

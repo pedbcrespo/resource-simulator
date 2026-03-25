@@ -15,7 +15,8 @@ typedef struct resource {
 } resource;
 
 void createGroup(group&root, resource& res);
-void updateGroups(group& root, resource& res);
+void updateGroups(group& root, resource& res, int round);
+void updateResource(group& root, resource& res, int round);
 void printGroup(group& root, resource& res);
 void printGroupSummary(group& root, resource& res);
 void insertLog(std::string log);
